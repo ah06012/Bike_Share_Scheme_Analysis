@@ -1,0 +1,194 @@
+---
+title: "Cyclistic"
+author: "Ahmed Ahmed"
+date: "14/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Analysis  
+
+
+## uploading data   
+
+
+Initially, I tried to upload files for the past 12 months. My Rstudio kept crashing. So I reviewed the discussion forum, where mentors advised to use only a single file to carry out the analysis. 
+
+We use the code below to upload the file to R
+
+```{r}
+dataset = read.csv("Sep-2021.csv")
+```
+
+To review the data uploaded we use the code below 
+
+```{r}
+head(dataset)
+```
+
+## cleaning data
+
+We noted that the different columns. To verify the integrity of the data, we will fist carry out further calculations to establish the data is valid before analysis.
+
+First we will calculate the length of each ride, the result should be positive in each instance.To add a column for the length of the ride, we will use the code below
+
+```{r}
+dataset$ride_length = difftime(dataset$ended_at, dataset$started_at, units = "mins")
+```
+
+we will then review the code using 
+
+```{r}
+head(dataset)
+```
+
+To inspect our data frame "dataset", we will run the summary function as shown below
+
+```{r}
+summary(dataset)
+```
+
+we can see that the ride_length column is not classed as numeric, and hence not returning discriptive statistics. So we will use
+the code below to convert the class for that column into numeric
+
+```{r}
+dataset$ride_length = as.numeric(dataset$ride_length)
+head(dataset)
+```
+
+Now let's run the summary function 
+
+```{r}
+summary(dataset)
+```
+
+We note a negative minimum. This should not be the case, since the time difference between rides can't be negative. Hence, we will need to inspect for any negative entries.
+
+
+```{r}
+dataset_errors = dataset[dataset$ride_length < 0,]
+head(dataset_errors)
+```
+
+To ensure clean data we will remove these negative entries, and name the new data frame "dataset_clean"
+
+
+```{r}
+dataset_clean = dataset[dataset$ride_length >= 0,]
+head(dataset_clean)
+```
+
+We then run the summary function 
+
+```{r}
+summary(dataset_clean)
+```
+
+Minimum ride length is zero. This looks better now. We note other columns such as start_lat, start_lng, end_lat,end_lng but we will assume the entries in this columns are accurate.We weren't provided with any explanation of the various table variables, so we shall assume in this instance that all the entries are correct and hence we now have clean data.
+
+
+## processing data 
+
+To get more insights into the data, we calculate day of the week the trip was made. This will assist us with our analysis later.
+So we have
+```{r}
+dataset_clean$day <- weekdays(as.Date(dataset_clean$started_at))
+head(dataset_clean)
+```
+
+We will then split the data frame into two. One for casual riders and another for member riders
+
+```{r}
+dataset_clean_casual = dataset_clean[dataset_clean$member_casual=="casual",]
+dataset_clean_member = dataset_clean[dataset_clean$member_casual=="member",]
+```
+
+To get an overview of the data we will print the data summary for both data frames
+
+```{r}
+summary(dataset_clean_casual)
+summary(dataset_clean_member)
+```
+
+We can see that for ride_length the statistics are all higher for casual riders. On average casual riders have a longer ride than member riders, by roughly 14 minutes. To investigate further the difference between casual and member riders we can look at the rides made by each category based on the days of week
+
+```{r}
+aggregate(ride_length ~ day, dataset_clean_member,mean)
+aggregate(ride_length ~ day, dataset_clean_casual,mean)
+```
+
+We can see that the duration of ride is roughly 2 folds greater for a casual rider on any day of the week, and with a spike in the weekend particularly on Sunday. We similar trend for member riders, however with a relatively smaller spike on the weekend particularly, again, on Sunday. 
+
+Another aspect to consider is the number of rides taking place on each weekday. Similar to the code above we have,
+
+
+```{r}
+aggregate(ride_length ~ day, dataset_clean_member,length)
+aggregate(ride_length ~ day, dataset_clean_casual,length)
+```
+
+We can see that the number of rides for both riders, members and casuals, range from 40,000 to 75,000 per month on a particular day of the week. We see that overall members have made more trips during the weekdays, Monday-Friday, than the weekend. In contrast, casuals have made more trips during the weekend than the weekdays.
+
+So to conclude, we can say that casuals spend more time riding their bikes. We can also say that member riders make more trips during the week, and less trips on the weekends compared to casual riders.
+
+## share 
+
+To investigate further the ride length, we can compare the box plots for member and casual riders. We can see that for casual riders, we have few data points that are exceedingly large. These could be investigated for outliers.Although there could be outliers which will affect the descriptive statistics summary we obtained above, the range for the casual riders is greater and so we can conclude that casual members drive longer. 
+
+```{r}
+library(tidyverse)
+library(hrbrthemes)
+library(viridis)
+ggplot(dataset_clean, aes(x=member_casual,y=ride_length)) + 
+  geom_boxplot(outlier.shape=NA) + 
+  geom_jitter(position=position_jitter(width=.1, height=0))
+```
+
+
+Another aspect of the data to investiage is the number of rides taking place on each day of the week. We will start with graphs, shown below :- 
+
+
+```{r}
+library(ggplot2)
+ggplot(data=dataset_clean_casual)+
+  geom_bar(mapping=aes(x=day,fill = day)) + 
+  xlab("day of the week") +
+  ylab("No. of trips") +
+  expand_limits(y = c(0, 80000))+
+  theme_classic()+
+  ggtitle("Bike hire frequency(casual)")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+ggplot(data=dataset_clean_member)+
+  geom_bar(mapping=aes(x=day,fill = day)) + 
+  xlab("day of the week") +
+  ylab("No. of trips") +
+  expand_limits(y = c(0, 80000))+
+  theme_classic()+
+  ggtitle("Bike hire frequency(member)")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+Contrasting both graphs we can see that member riders make more trips on weekdays whereas casual riders make more trips during the weekend. We know that the majority of users are more likely to ride for leisure, so it seems that most likely to take place on Saturday and Sunday. These users are more likely to be casual riders than members. 
+
+Since it is leisure riders will take  their time, hence why overall they are more likely to ride longer than member riders who are more likely to commute to work and so will only use the scheme for a shorter time. 
+
+
+```{r}
+ggplot(dataset_clean, aes(x = ride_length, fill = member_casual)) + 
+  geom_density(alpha = 0.5)+
+  xlim(0,200) +
+  xlab("length of ride (mins)") 
+```
+
+
+ 
+
+
